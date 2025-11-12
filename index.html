@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sylvaria News Service</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Segoe UI', Inter, sans-serif;
+      margin: 0;
+      color: #fff;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      overflow-x:hidden;
+    }
+    .bg-anim {
+      position: fixed; inset: 0; z-index: -1;
+      background: radial-gradient(1200px 600px at 20% 20%, rgba(62,240,255,0.15), transparent),
+                  radial-gradient(1200px 600px at 80% 30%, rgba(255,122,182,0.12), transparent),
+                  radial-gradient(1200px 600px at 50% 80%, rgba(255,255,255,0.08), transparent);
+      animation: float 18s ease-in-out infinite alternate;
+      pointer-events:none;
+    }
+    @keyframes float { 0%{transform:translateY(0);} 100%{transform:translateY(-20px);} }
+
+    header {
+      backdrop-filter: blur(14px);
+      background: rgba(255,255,255,0.06);
+      padding: 1.2rem 2rem;
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    nav {
+      display:flex; justify-content:center; gap:1rem;
+      background: rgba(255,255,255,0.08); padding:0.8rem;
+    }
+    nav a { color:#fff; text-decoration:none; font-weight:600; }
+    nav a:hover { color:#3ef0ff; }
+
+    #content { display:grid; grid-template-columns:320px 1fr 320px; gap:1.6rem; padding:1.6rem; }
+    .card {
+      background: rgba(255,255,255,0.1); backdrop-filter: blur(14px);
+      border-radius:16px; padding:1rem; margin-bottom:1rem;
+    }
+    input, textarea, select, button {
+      margin:6px 0; padding:0.7rem; width:90%; max-width:280px;
+      border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.25); color:#fff;
+    }
+    .button {
+      background: linear-gradient(135deg, #22c55e, #76e0a1);
+      color:#000; font-weight:700; border:none; border-radius:12px;
+      cursor:pointer; padding:0.8rem 1rem;
+    }
+    .button:hover { filter:brightness(1.1); }
+    .list { display:flex; flex-direction:column; gap:0.5rem; }
+    .list-item { display:flex; justify-content:space-between; padding:0.5rem; background:rgba(255,255,255,0.06); border-radius:10px; }
+    .badge { background:rgba(255,255,255,0.16); padding:0.2rem 0.5rem; border-radius:999px; font-size:0.8rem; }
+    footer { text-align:center; margin:1rem; color:rgba(255,255,255,0.7); }
+
+    .modal { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:9999; }
+    .modal-content { width:min(900px,92vw); background:rgba(255,255,255,0.1); backdrop-filter:blur(14px); border-radius:18px; padding:1rem; }
+    .close-x { cursor:pointer; float:right; }
+  </style>
+</head>
+<body>
+  <div class="bg-anim"></div>
+  <header>
+    <div class="title">📰 Sylvaria News Service</div>
+    <div>
+      <select id="themeSelect" onchange="changeTheme(this.value)">
+        <option value="summer" selected>Summer</option>
+        <option value="spring">Spring</option>
+        <option value="autumn">Autumn</option>
+        <option value="winter">Winter</option>
+      </select>
+    </div>
+  </header>
+
+  <nav>
+    <a href="#" onclick="showChannel('Culture')">Culture</a>
+    <a href="#" onclick="showChannel('Economy')">Economy</a>
+    <a href="#" onclick="showChannel('Politics')">Politics</a>
+    <a href="#" onclick="showChannel('Tech')">Tech</a>
+    <a href="#" onclick="showAllApproved()">All</a>
+  </nav>
+
+  <div id="content">
+    <div>
+      <div class="card" id="loginCard">
+        <h3>Login</h3>
+        <button class="button" onclick="googleLogin()">Sign in with Google (Citizen)</button>
+        <hr>
+        <h4>Creator Login</h4>
+        <input id="loginUser" placeholder="Username">
+        <input id="loginPass" type="password" placeholder="Password">
+        <button class="button" onclick="login()">Login</button>
+      </div>
+
+      <div class="card" id="signupCard">
+        <h3>Sign Up (Creator)</h3>
+        <input id="signupUser" placeholder="Username">
+        <input id="signupPass" type="password" placeholder="Password">
+        <input id="signupDisplayName" placeholder="Display name">
+        <textarea id="signupDescription" placeholder="Short description/bio"></textarea>
+        <input id="signupPronouns" placeholder="Pronouns (optional)">
+        <input type="file" id="signupProfilePicFile" accept="image/*">
+        <div style="width:300px;height:300px;"><img id="cropPreview" style="max-width:100%;"/></div>
+        <button class="button" onclick="cropAndUpload()">Upload & Crop</button>
+        <button class="button" onclick="signup()">Request Creator Account</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card"><h2>Latest</h2><div id="articleList"></div></div>
+    </div>
+
+    <div>
+      <div class="card"><h3>Trending Topics</h3><div id="trendingList" class="list"></div></div>
+      <div class="card"><h3>Creators</h3><div id="creatorDirectory" class="list"></div></div>
+    </div>
+  </div>
+
+  <footer>© Sylvaria News 2026 • Colorful, modern, citizen-powered</footer>
+
+  <!-- Modals -->
+  <div id="adminModal" class="modal"><div class="modal-content"><div class="close-x" onclick="closeAdminModal()">✕</div><h3>Admin Portal</h3><div id="adminContent"></div></div></div>
+  <div id="creatorModal" class="modal"><div class="modal-content"><div class="close-x" onclick="closeCreatorModal()">✕</div><h3>Creator Portal</h3><div id="creatorContent"></div></div></div>
+
+  <!-- Firebase + Cropper -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+<script>
+  // Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyC73vbdzIj2xjQtZ62a0skU8vvAXGJk-7Y",
+    authDomain: "sylvaria-news.firebaseapp.com",
+    projectId: "sylvaria-news",
+    storageBucket: "sylvaria-news.firebasestorage.app",
+    messagingSenderId: "33007586013",
+    appId: "1:33007586013:web:a8361baa22b3d31e57e934",
+    measurementId: "G-RT3LMNP913"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+  const storage = firebase.storage();
+  const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+  // State
+  let currentUser = null;        // string (creator username or citizen display name)
+  let currentUserUID = null;     // for citizens
+  let isAdmin = false;
+  let isCreator = false;
+  let cropper = null;
+  let croppedProfilePicURL = null;
+
+  // Theme handling (simple palette tweaks)
+  function changeTheme(t){
+    const root = document.documentElement;
+    if(t === "summer"){
+      root.style.setProperty("--btn-grad-start", "#22c55e");
+      root.style.setProperty("--btn-grad-end", "#76e0a1");
+      document.body.style.background = "linear-gradient(135deg, #0b1736, #162a5b, #1f3a73)";
+    } else if(t === "spring"){
+      root.style.setProperty("--btn-grad-start", "#34d399");
+      root.style.setProperty("--btn-grad-end", "#a7f3d0");
+      document.body.style.background = "linear-gradient(135deg, #0d1f1d, #1f3b2d, #285943)";
+    } else if(t === "autumn"){
+      root.style.setProperty("--btn-grad-start", "#f59e0b");
+      root.style.setProperty("--btn-grad-end", "#fbbf24");
+      document.body.style.background = "linear-gradient(135deg, #1a0f06, #3b220f, #5a3316)";
+    } else if(t === "winter"){
+      root.style.setProperty("--btn-grad-start", "#60a5fa");
+      root.style.setProperty("--btn-grad-end", "#93c5fd");
+      document.body.style.background = "linear-gradient(135deg, #0a1220, #122036, #1a2c4a)";
+    }
+  }
+
+  // Modals
+  function openAdminModal(){
+    document.getElementById("adminModal").style.display = "flex";
+    renderAdminPortal();
+  }
+  function closeAdminModal(){
+    document.getElementById("adminModal").style.display = "none";
+  }
+  function openCreatorModal(){
+    document.getElementById("creatorModal").style.display = "flex";
+    renderCreatorPortal();
+  }
+  function closeCreatorModal(){
+    document.getElementById("creatorModal").style.display = "none";
+  }
+
+  // Auth: Citizen via Google
+  async function googleLogin(){
+    try {
+      const result = await auth.signInWithPopup(googleProvider);
+      const user = result.user;
+      currentUser = user.displayName || user.email || user.uid;
+      currentUserUID = user.uid;
+      isAdmin = false; isCreator = false;
+      alert("Signed in as citizen: " + currentUser);
+      // Show follow directory and allow commenting/liking as citizen
+      loadCreatorDirectory();
+    } catch(e){
+      alert("Google sign-in failed: " + e.message);
+    }
+  }
+
+  // Auth: Creator and Admin
+  async function login(){
+    const user = (document.getElementById("loginUser").value||"").trim();
+    const pass = (document.getElementById("loginPass").value||"").trim();
+    // Admin hardcoded
+    if(user === "GOV" && pass === "Securegov"){
+      isAdmin = true; isCreator = false; currentUser = "GOV";
+      alert("Admin logged in.");
+      openAdminModal();
+      return;
+    }
+    // Creator check
+    const snapshot = await db.collection("users")
+      .where("user","==",user)
+      .where("pass","==",pass)
+      .where("approved","==",true)
+      .where("role","==","creator").get();
+    if(!snapshot.empty){
+      isCreator = true; isAdmin = false; currentUser = user;
+      alert("Creator logged in.");
+      openCreatorModal();
+    } else {
+      alert("Login failed or not approved yet.");
+    }
+  }
+
+  // Signup: Creator with crop/uploaded profile picture
+  document.getElementById("signupProfilePicFile").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      const img = document.getElementById("cropPreview");
+      img.src = evt.target.result;
+      if(cropper){ cropper.destroy(); }
+      cropper = new Cropper(img, { aspectRatio: 1, viewMode: 1, dragMode: "move" });
+    };
+    reader.readAsDataURL(file);
+  });
+
+  async function cropAndUpload(){
+    if(!cropper){ alert("Upload an image first."); return; }
+    const canvas = cropper.getCroppedCanvas({ width: 300, height: 300 });
+    canvas.toBlob(async (blob)=>{
+      try {
+        const path = "profilePics/" + Date.now() + ".png";
+        const storageRef = storage.ref(path);
+        await storageRef.put(blob);
+        croppedProfilePicURL = await storageRef.getDownloadURL();
+        alert("Profile picture uploaded!");
+      } catch(e){
+        alert("Upload failed: " + e.message);
+      }
+    }, "image/png");
+  }
+
+  async function signup(){
+    const user = (document.getElementById("signupUser").value||"").trim();
+    const pass = (document.getElementById("signupPass").value||"").trim();
+    const displayName = (document.getElementById("signupDisplayName").value||"").trim();
+    const description = (document.getElementById("signupDescription").value||"").trim();
+    const pronouns = (document.getElementById("signupPronouns").value||"").trim();
+    const profilePic = croppedProfilePicURL;
+
+    if(!user || !pass || !displayName || !description || !profilePic){
+      alert("Username, password, display name, description, and cropped profile picture are required.");
+      return;
+    }
+    await db.collection("users").add({
+      user, pass, role:"creator", approved:false, created:new Date(),
+      displayName, description, pronouns: pronouns || null, profilePic,
+      followersCount: 0
+    });
+    alert("Creator signup submitted. Await admin approval.");
+    // reset form
+    ["signupUser","signupPass","signupDisplayName","signupDescription","signupPronouns"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("signupProfilePicFile").value="";
+    const img = document.getElementById("cropPreview");
+    img.src = ""; if(cropper){ cropper.destroy(); cropper = null; }
+    croppedProfilePicURL = null;
+  }
+
+  // Feed
+  async function showChannel(channel){
+    const snapshot = await db.collection("articles")
+      .where("channel","==",channel)
+      .where("approved","==",true).get();
+    renderArticles(snapshot);
+  }
+  async function showAllApproved(){
+    const snapshot = await db.collection("articles")
+      .where("approved","==",true).get();
+    renderArticles(snapshot);
+  }
+  function renderArticles(snapshot){
+    const list = document.getElementById("articleList");
+    list.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data();
+      const id = docSnap.id;
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <h3>${d.title}</h3>
+        <div class="badge">By ${d.author || "Unknown"} • ${d.channel} • Likes: ${d.likes||0}</div>
+        <p>${d.content}</p>
+        <button class="button" onclick="likeArticle('${id}')">👍 Like</button>
+        <div class="comment-box">
+          <input id="comment-${id}" placeholder="Add comment">
+          <button class="button" onclick="addComment('${id}')">Comment</button>
+          <div id="comments-${id}"></div>
+        </div>`;
+      list.appendChild(card);
+      loadComments(id);
+    });
+  }
+
+  // Comments & Likes
+  async function likeArticle(id){
+    const ref = db.collection("articles").doc(id);
+    await ref.update({likes: firebase.firestore.FieldValue.increment(1)});
+    refreshTrending();
+    showAllApproved(); // refresh counts
+  }
+  async function addComment(articleId){
+    const input = document.getElementById("comment-"+articleId);
+    const text = (input.value||"").trim();
+    if(!text) return;
+    await db.collection("comments").add({
+      articleId, user: currentUser || "Anonymous", text, timestamp: new Date()
+    });
+    input.value = "";
+    loadComments(articleId);
+  }
+  async function loadComments(articleId){
+    const snapshot = await db.collection("comments")
+      .where("articleId","==",articleId)
+      .orderBy("timestamp","asc").get();
+    const container = document.getElementById("comments-"+articleId);
+    container.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data();
+      const line = document.createElement("div");
+      line.innerHTML = `<p><strong>${d.user}:</strong> ${d.text}</p>`;
+      container.appendChild(line);
+    });
+  }
+
+  // Creator portal
+  async function renderCreatorPortal(){
+    const mount = document.getElementById("creatorContent");
+    mount.innerHTML = "";
+    // Profile
+    const profSnap = await db.collection("users").where("user","==",currentUser).limit(1).get();
+    let profileHTML = "<div class='card'><h4>Profile</h4><p>Profile not found.</p></div>";
+    if(!profSnap.empty){
+      const d = profSnap.docs[0].data();
+      profileHTML = `
+        <div class="card" style="display:flex;gap:1rem;align-items:center;">
+          <img src="${d.profilePic}" alt="profile" style="width:72px;height:72px;border-radius:14px;object-fit:cover;border:1px solid rgba(255,255,255,0.2)">
+          <div>
+            <h3 style="margin:0">${d.displayName}</h3>
+            <div class="badge">${d.pronouns || "—"}</div>
+            <div style="font-size:0.9rem;opacity:0.85;margin-top:0.3rem">${d.description}</div>
+            <div class="badge" style="margin-top:0.4rem;">Followers: ${d.followersCount||0}</div>
+          </div>
+        </div>`;
+    }
+    // Create form
+    const createHTML = `
+      <div class="card">
+        <h4>New Article</h4>
+        <input id="articleTitle" placeholder="Title">
+        <textarea id="articleContent" placeholder="Content"></textarea>
+        <select id="articleChannel">
+          <option value="Culture">Culture</option>
+          <option value="Economy">Economy</option>
+          <option value="Politics">Politics</option>
+          <option value="Tech">Tech</option>
+        </select>
+        <button class="button" onclick="submitArticle()">Submit for Review</button>
+      </div>`;
+    // Drafts
+    const draftsHTML = `<div class="card"><h4>My Drafts</h4><div id="myDraftsList" class="list"></div></div>`;
+
+    mount.innerHTML = profileHTML + createHTML + draftsHTML;
+    loadMyDrafts();
+  }
+  async function loadMyDrafts(){
+    const snapshot = await db.collection("articles")
+      .where("author","==",currentUser)
+      .where("approved","==",false).get();
+    const list = document.getElementById("myDraftsList");
+    list.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data();
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div>
+          <strong>${d.title}</strong> <span class="badge">${d.channel}</span>
+          <div style="font-size:0.85rem;opacity:0.8;">Pending review</div>
+        </div>
+        <div>
+          <button class="button" onclick="previewDraft('${docSnap.id}')">Preview</button>
+          <button class="button" onclick="deleteDraft('${docSnap.id}')">Delete</button>
+        </div>`;
+      list.appendChild(row);
+    });
+    if(snapshot.empty){ list.innerHTML = `<div class="list-item"><em>No drafts yet.</em></div>`; }
+  }
+  async function previewDraft(id){
+    const docSnap = await db.collection("articles").doc(id).get();
+    if(docSnap.exists){
+      const d = docSnap.data();
+      alert("Preview:\nTitle: "+d.title+"\nChannel: "+d.channel+"\n\n"+d.content);
+    }
+  }
+  async function deleteDraft(id){
+    await db.collection("articles").doc(id).delete();
+    loadMyDrafts();
+    alert("Draft deleted.");
+  }
+  async function submitArticle(){
+    if(!isCreator){ alert("Login as a Creator to submit."); return; }
+    const title = (document.getElementById("articleTitle").value||"").trim();
+    const content = (document.getElementById("articleContent").value||"").trim();
+    const channel = document.getElementById("articleChannel").value;
+    if(!title || !content){ alert("Title and content required."); return; }
+    await db.collection("articles").add({
+      title, content, channel, author: currentUser,
+      approved: false, likes: 0, created: new Date()
+    });
+    document.getElementById("articleTitle").value="";
+    document.getElementById("articleContent").value="";
+    alert("Article submitted for admin review.");
+    loadMyDrafts();
+  }
+
+  // Admin portal
+  async function renderAdminPortal(){
+    const mount = document.getElementById("adminContent");
+    mount.innerHTML = `
+      <div class="card"><h4>User Requests</h4><div id="userRequests" class="list"></div></div>
+      <div class="card"><h4>Article Review</h4><div id="articleQueue" class="list"></div></div>
+      <div class="card"><h4>Stats</h4><div id="adminStatsContent" class="list"></div></div>
+    `;
+    loadUserRequests();
+    loadArticleQueue();
+    refreshAdminStats();
+  }
+  async function loadUserRequests(){
+    const snapshot = await db.collection("users")
+      .where("approved","==",false)
+      .where("role","==","creator").get();
+    const list = document.getElementById("userRequests");
+    list.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data();
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div>
+          <strong>${d.user}</strong> <span class="badge">${d.displayName}</span>
+          <div style="font-size:0.85rem;opacity:0.8;">${d.description}</div>
+          <div style="font-size:0.85rem;opacity:0.8;">Pronouns: ${d.pronouns||"—"}</div>
+        </div>
+        <div>
+          <button class="button" onclick="previewCreator('${docSnap.id}')">Preview</button>
+          <button class="button" onclick="approveUser('${docSnap.id}','${d.user}')">Approve</button>
+          <button class="button" onclick="rejectUser('${docSnap.id}','${d.user}')">Reject</button>
+        </div>`;
+      list.appendChild(row);
+    });
+    if(snapshot.empty){ list.innerHTML = `<div class="list-item"><em>No pending requests.</em></div>`; }
+  }
+  async function previewCreator(id){
+    const docSnap = await db.collection("users").doc(id).get();
+    if(docSnap.exists){
+      const d = docSnap.data();
+      alert("Creator Preview:\nUsername: "+d.user+"\nDisplay: "+d.displayName+"\nPronouns: "+(d.pronouns||'—')+"\n\nBio:\n"+d.description);
+    }
+  }
+  async function approveUser(id, user){
+    await db.collection("users").doc(id).update({approved:true});
+    loadUserRequests();
+    alert(`Approved ${user}.`);
+    loadCreatorDirectory();
+  }
+  async function rejectUser(id, user){
+    await db.collection("users").doc(id).delete();
+    loadUserRequests();
+    alert(`Rejected ${user}.`);
+  }
+
+  async function loadArticleQueue(){
+    const snapshot = await db.collection("articles")
+      .where("approved","==",false).get();
+    const list = document.getElementById("articleQueue");
+    list.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data();
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div>
+          <div><strong>${d.title}</strong> <span class="badge">${d.channel}</span></div>
+          <div style="font-size:0.85rem;opacity:0.8;">By ${d.author || 'Unknown'} • Submitted ${d.created ? new Date(d.created.seconds?d.created.seconds*1000:d.created).toLocaleString() : '—'}</div>
+        </div>
+        <div>
+          <button class="button" onclick="previewArticle('${docSnap.id}')">Preview</button>
+          <button class="button" onclick="approveArticle('${docSnap.id}')">Approve</button>
+          <button class="button" onclick="rejectArticle('${docSnap.id}')">Reject</button>
+        </div>`;
+      list.appendChild(row);
+    });
+    if(snapshot.empty){ list.innerHTML = `<div class="list-item"><em>No articles in review.</em></div>`; }
+  }
+  async function previewArticle(id){
+    const docSnap = await db.collection("articles").doc(id).get();
+    if(docSnap.exists){
+      const d = docSnap.data();
+      alert("Article Preview:\nTitle: "+d.title+"\nChannel: "+d.channel+"\nAuthor: "+(d.author||'Unknown')+"\n\n"+d.content);
+    }
+  }
+  async function approveArticle(id){
+    await db.collection("articles").doc(id).update({approved:true, approvedAt:new Date(), approvedBy:"GOV"});
+    loadArticleQueue();
+    alert("Article approved.");
+    refreshTrending();
+    showAllApproved();
+  }
+  async function rejectArticle(id){
+    await db.collection("articles").doc(id).delete();
+    loadArticleQueue();
+    alert("Article rejected and removed.");
+  }
+
+  // Trending
+  async function refreshTrending(){
+    const channels = ["Culture","Economy","Politics","Tech"];
+    const results = [];
+    for(const ch of channels){
+      const snapshot = await db.collection("articles")
+        .where("channel","==",ch)
+        .where("approved","==",true).get();
+      let count = 0, likes = 0;
+      snapshot.forEach(docSnap=>{
+        count++;
+        const d = docSnap.data();
+        likes += (d.likes||0);
+      });
+      results.push({channel:ch, count, likes});
+    }
+    results.sort((a,b)=> (b.likes + b.count) - (a.likes + a.count));
+    const list = document.getElementById("trendingList");
+    list.innerHTML = "";
+    results.forEach(r=>{
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div><strong>${r.channel}</strong></div>
+        <div><span class="badge">Articles: ${r.count}</span> <span class="badge">Likes: ${r.likes}</span></div>`;
+      list.appendChild(row);
+    });
+  }
+
+  // Creator directory + follow
+  async function loadCreatorDirectory(){
+    const snapshot = await db.collection("users")
+      .where("role","==","creator")
+      .where("approved","==",true).get();
+    const list = document.getElementById("creatorDirectory");
+    list.innerHTML = "";
+    snapshot.forEach(docSnap=>{
+      const d = docSnap.data(); const id = docSnap.id;
+      const row = document.createElement("div");
+      row.className = "list-item";
+      row.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <img src="${d.profilePic}" alt="profile" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,0.2)">
+          <div>
+            <strong>${d.displayName}</strong> <span class="badge">${d.pronouns || '—'}</span><br>
+            <span style="font-size:0.85rem;opacity:0.8">${d.description}</span>
+          </div>
+        </div>
+        <div>
+          <span class="badge" id="dirFollowers-${id}">Followers: ${d.followersCount||0}</span>
+          <button class="button" onclick="toggleFollow('${id}')">Follow/Unfollow</button>
+        </div>`;
+      list.appendChild(row);
+    });
+  }
+  async function toggleFollow(creatorDocId){
+    if(!currentUserUID){ alert("Sign in with Google to follow creators."); return; }
+    const followId = `${currentUserUID}__${creatorDocId}`;
+    const followRef = db.collection("follows").doc(followId);
+    const existing = await followRef.get();
+    if(existing.exists){
+      await followRef.delete();
+      await updateFollowersCount(creatorDocId, -1);
+    } else {
+      await followRef.set({ followerUID: currentUserUID, creatorDocId, timestamp: new Date() });
+      await updateFollowersCount(creatorDocId, +1);
+    }
+    loadCreatorDirectory();
+  }
+  async function updateFollowersCount(creatorDocId, delta){
+    const userRef = db.collection("users").doc(creatorDocId);
+    await userRef.update({ followersCount: firebase.firestore.FieldValue.increment(delta) });
+    const docSnap = await userRef.get();
+    const d = docSnap.data();
+    const countEl = document.getElementById("dirFollowers-"+creatorDocId);
+    if(countEl){ countEl.textContent = "Followers: " + (d.followersCount||0); }
+    if(isCreator){ renderCreatorPortal(); }
+  }
+
+  // Expose globals for inline handlers
+  window.changeTheme = changeTheme;
+  window.googleLogin = googleLogin;
+  window.login = login;
+  window.cropAndUpload = cropAndUpload;
+  window.signup = signup;
+
+  window.showChannel = showChannel;
+  window.showAllApproved = showAllApproved;
+
+  window.likeArticle = likeArticle;
+  window.addComment = addComment;
+
+  window.previewDraft = previewDraft;
+  window.deleteDraft = deleteDraft;
+  window.submitArticle = submitArticle;
+
+  window.openAdminModal = openAdminModal;
+  window.closeAdminModal = closeAdminModal;
+  window.openCreatorModal = openCreatorModal;
+  window.closeCreatorModal = closeCreatorModal;
+
+  window.previewCreator = previewCreator;
+  window.approveUser = approveUser;
+  window.rejectUser = rejectUser;
+
+  window.previewArticle = previewArticle;
+  window.approveArticle = approveArticle;
+  window.rejectArticle = rejectArticle;
+
+  window.refreshTrending = refreshTrending;
+  window.loadCreatorDirectory = loadCreatorDirectory;
+  window.toggleFollow = toggleFollow;
+
+  // Initial load
+  changeTheme(document.getElementById("themeSelect").value);
+  showAllApproved();
+  refreshTrending();
+  loadCreatorDirectory();
+</script>
+</body>
+</html>
